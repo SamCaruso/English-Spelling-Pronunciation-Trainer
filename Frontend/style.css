@@ -1,0 +1,295 @@
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+#app {
+    max-width: 650px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+}
+
+/* --- Auth screen --- */
+
+.auth-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    background: white;
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    margin-top: 2rem;
+}
+
+.auth-box input {
+    width: 100%;
+    max-width: 300px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.auth-box input:focus {
+    border-color: #764ba2;
+}
+
+.auth-box button {
+    width: 100%;
+    max-width: 300px;
+    padding: 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.auth-box button:first-of-type {
+    background: #764ba2;
+    color: white;
+}
+
+.auth-box button:last-of-type {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.auth-box button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.auth-box button:disabled {
+    opacity: 0.6;
+    transform: none;
+    cursor: not-allowed;
+}
+
+.auth-box .feedback {
+    color: #d32f2f;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* --- Main content --- */
+
+h1 {
+    color: white;
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+h2 {
+    color: white;
+    font-size: 1.5rem;
+}
+
+h3 {
+    color: #333;
+}
+
+button {
+    margin: 0.5rem 0.25rem;
+    padding: 0.7rem 1.4rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #58cc02;
+    color: white;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+button:disabled {
+    opacity: 0.5;
+    transform: none;
+    cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    padding: 0.6rem 0.8rem;
+    font-size: 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+    border-color: #764ba2;
+}
+
+/* --- Exercise cards --- */
+
+.exercise-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.exercise-item {
+    margin: 1.2rem 0;
+    padding: 1rem;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border-left: 4px solid #764ba2;
+}
+
+/* --- Text styles --- */
+
+.test {
+    color: #d32f2f;
+    font-weight: bold;
+    font-size: 1.3rem;
+}
+
+.solution {
+    color: #1565c0;
+    font-weight: bold;
+    font-style: italic;
+    font-size: 1.3rem;
+}
+
+.clickable-word {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    font-weight: bold;
+}
+
+.clickable-word:hover {
+    text-decoration-style: solid;
+    opacity: 0.8;
+}
+
+.feedback {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    color: #333;
+}
+
+.feedback-failed {
+    font-size: 1rem;
+    font-weight: normal;
+    color: #555;
+}
+
+.instructions {
+    font-size: 1.05rem;
+    color: #555;
+}
+
+.general {
+    font-size: 1.05rem;
+    color: #ffffff;
+}
+
+.warning {
+    font-size: 1rem;
+    font-weight: bold;
+    font-style: italic;
+    color: #ffffff;
+    
+}
+
+.patterns {
+    list-style: none;
+    padding-left: 0;
+    margin: 1em 0;
+    font-size: 1.05rem;
+    color: white;
+}
+
+.patterns li {
+    margin: 0.6em 0;
+    line-height: 1.5;
+    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+}
+
+.steps li {
+    font-size: 1.2rem;
+    font-weight: bold;
+    line-height: 2;
+    list-style-type: none;
+    color: white;
+}
+
+.answer li {
+    font-size: 1.05rem;
+    color: #333;
+}
+
+/* --- Logout button --- */
+
+button[style*="float: right"] {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    position: absolute;
+    top: 0.3rem;
+    right: 0.5rem;
+}
+
+button[style*="float: right"]:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+#app {
+    position: relative;
+}
+
+/* --- Phoneme card (learn + review) --- */
+
+.phoneme-card {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.phoneme-card h2 {
+    color: white;
+    margin-top: 0;
+}
+
+.phoneme-card h3,
+.phoneme-card p {
+    color: rgba(255, 255, 255, 0.9);
+}
