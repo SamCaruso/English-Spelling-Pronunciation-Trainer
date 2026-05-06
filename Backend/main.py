@@ -90,6 +90,21 @@ def check_idempotency(idempotency_key: str, endpoint: str, func, *args):
     return result
 
 
+# --- Public endpoint (no auth needed) ---
+
+@app.get('/api/firebase-config')
+async def firebase_config():
+    """Serve Firebase config to the frontend (keeps API key out of source code)."""
+    return {
+        'apiKey': config.FIREBASE_API_KEY,
+        'authDomain': 'spell-pron-trainer.firebaseapp.com',
+        'projectId': 'spell-pron-trainer',
+        'storageBucket': 'spell-pron-trainer.firebasestorage.app',
+        'messagingSenderId': '1034759911844',
+        'appId': '1:1034759911844:web:b66abbb21c075f66986931',
+    }
+
+
 # --- Authenticated endpoints (user_id from Firebase token) ---
 
 @app.get('/api/reviewstatus', response_model=s.ReviewResponse)

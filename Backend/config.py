@@ -8,6 +8,7 @@ import os
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 GCS_BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME', '')
+FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
 # Firestore collection names
 USERS_COLLECTION = 'users'
