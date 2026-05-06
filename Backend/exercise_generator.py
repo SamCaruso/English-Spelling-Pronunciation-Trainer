@@ -46,6 +46,8 @@ Your task: for each entry, generate THREE things:
    Example: If wrong_sentence is "After years of arguments, they decided to get a divauce", then wrong_help_sentence is "After years of arguments, they decided to get a /dɪ'vɔ:s/."
 
 Rules:
+- Use British English spelling throughout (e.g. "specialised" not "specialized", "colour" not "color", "centre" not "center").
+- Each sentence must be unique and clearly distinguishable from the others. Do not reuse sentence structures across entries.
 - Use natural, everyday English sentences.
 - The sentences should make the meaning of the target word clear from context.
 - The sentence must make grammatical and logical sense if you mentally replace the misspelled word with the correct spelling.
@@ -117,10 +119,18 @@ def generate_exercises(phoneme: str, spelling: dict, count_per_level: int = 4) -
     if 'items' not in llm_result or len(llm_result['items']) != expected_count:
         raise ValueError(f'Expected {expected_count} items from OpenAI, got {len(llm_result.get("items", []))}')
 
+    # Index LLM results by IPA key for reliable matching (LLM may reorder items)
+    llm_by_ipa = {}
+    for item in llm_result['items']:
+        ipa_key = item.get('ipa', '').strip()
+        llm_by_ipa[ipa_key] = item
+
     # Level 1: Contextual IPA (easiest)
     level1_items = []
-    for i, item in enumerate(llm_result['items'][:count_per_level]):
-        key = level1_keys[i]
+    for key in level1_keys:
+        item = llm_by_ipa.get(key)
+        if not item:
+            raise ValueError(f'LLM did not return item for IPA key: {key}')
         options = list(spelling[key])
         random.shuffle(options)
         level1_items.append({
@@ -133,8 +143,10 @@ def generate_exercises(phoneme: str, spelling: dict, count_per_level: int = 4) -
 
     # Level 2: Wrong spelling in context (medium)
     level2_items = []
-    for i, item in enumerate(llm_result['items'][count_per_level:]):
-        key = level2_keys[i]
+    for key in level2_keys:
+        item = llm_by_ipa.get(key)
+        if not item:
+            raise ValueError(f'LLM did not return item for IPA key: {key}')
         level2_items.append({
             'ipa': key,
             'answer': spelling[key][0],

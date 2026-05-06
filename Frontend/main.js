@@ -447,12 +447,12 @@ async function reviewCheck(reviewStatus, div, displayName) {
         sub.textContent = "No new phonemes to learn. Let's review previously studied ones";
         div.append(sub);
 
+        // Fetch covered FIRST (fast), then start LLM generation
         const coveredPromise = fetchPhonemesCovered();
-        const reviewExPromise = fetchReviewExercises();
-
-        // Suppress unhandled rejection — errors are caught when awaited
         coveredPromise.catch(() => {});
-        reviewExPromise.catch(() => {});
+
+        // Start LLM only after covered request is sent
+        const reviewExPromise = coveredPromise.then(() => fetchReviewExercises()).catch(() => {});
 
         await review(div, coveredPromise, reviewExPromise);
         const bye = document.createElement('p');
@@ -483,12 +483,12 @@ async function reviewCheck(reviewStatus, div, displayName) {
     sub.textContent = 'Ready to start the review?';
     div.append(sub);
 
+    // Fetch covered FIRST (fast), then start LLM generation
     const coveredPromise = fetchPhonemesCovered();
-    const reviewExPromise = fetchReviewExercises();
-
-    // Suppress unhandled rejection — errors are caught when awaited
     coveredPromise.catch(() => {});
-    reviewExPromise.catch(() => {});
+
+    // Start LLM only after covered request is sent (avoids blocking on single-worker)
+    const reviewExPromise = coveredPromise.then(() => fetchReviewExercises()).catch(() => {});
 
     await review(div, coveredPromise, reviewExPromise);
     const learnBtn = document.createElement('button');
@@ -1238,6 +1238,10 @@ async function startFullReview() {
 
 
 async function showReviewOptions(host, { includeCurrentBtn = true } = {}) {
+    // Check how many phonemes the user has to decide which buttons to show
+    const covered = await fetchPhonemesCovered();
+    const hasMultiple = covered.length > 1;
+
     const buttons = [];
 
     if (includeCurrentBtn) {
@@ -1247,13 +1251,15 @@ async function showReviewOptions(host, { includeCurrentBtn = true } = {}) {
         buttons.push(reviewCurrentBtn);
     }
 
-    const reviewAllBtn = document.createElement('button');
-    reviewAllBtn.textContent = 'Review all phonemes';
-    host.append(reviewAllBtn);
-    buttons.push(reviewAllBtn);
+    if (hasMultiple || !includeCurrentBtn) {
+        const reviewAllBtn = document.createElement('button');
+        reviewAllBtn.textContent = 'Review all phonemes';
+        host.append(reviewAllBtn);
+        buttons.push(reviewAllBtn);
+    }
 
     await new Promise((resolve) => {
-        if (includeCurrentBtn) {
+        if (includeCurrentBtn && buttons[0]) {
             buttons[0].addEventListener('click', async () => {
                 buttons.forEach(b => b.remove());
                 div.replaceChildren();
@@ -1267,18 +1273,20 @@ async function showReviewOptions(host, { includeCurrentBtn = true } = {}) {
                 const newHost = document.createElement('div');
                 div.append(newHost);
 
-                const covered = await fetchPhonemesCovered();
                 const lastPhoneme = covered[covered.length - 1].phoneme;
                 await runSingleReview(lastPhoneme, newHost);
                 resolve();
             });
         }
 
-        reviewAllBtn.addEventListener('click', async () => {
-            buttons.forEach(b => b.remove());
-            await startFullReview();
-            resolve();
-        });
+        const reviewAllBtn = buttons.find(b => b.textContent === 'Review all phonemes');
+        if (reviewAllBtn) {
+            reviewAllBtn.addEventListener('click', async () => {
+                buttons.forEach(b => b.remove());
+                await startFullReview();
+                resolve();
+            });
+        }
     });
 }
 
