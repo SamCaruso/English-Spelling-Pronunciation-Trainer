@@ -1252,8 +1252,17 @@ async function testHomophone(homoph, index, host) {
     if (homoph.sample_word) {
         target.style.cursor = 'pointer';
         target.title = 'Click to hear pronunciation';
-        target.addEventListener('click', () => {
-            new Audio(wordAudioUrl(homoph.sample_word)).play();
+        const audio = new Audio(wordAudioUrl(homoph.sample_word));
+        let playing = false;
+        audio.onended = () => { playing = false; };
+        audio.onerror = () => { playing = false; };
+        target.addEventListener('click', (e) => {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            if (playing) return;
+            playing = true;
+            audio.currentTime = 0;
+            audio.play().catch(() => { playing = false; });
         });
     }
     const rest = document.createTextNode(` has ${homoph.amount} homophones`);
