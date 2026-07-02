@@ -95,8 +95,6 @@ def register_homophone_tests(homophones_data: list[dict], phoneme_homophones: di
     Store homophone answers in Firestore.
     Each homophone test stores the full set of valid spellings.
     """
-    from audio_service import get_audio_url
-
     batch = db.batch()
     tests = []
 
@@ -111,13 +109,12 @@ def register_homophone_tests(homophones_data: list[dict], phoneme_homophones: di
             'expires_at': datetime.now(timezone.utc) + timedelta(hours=5),
         }
         batch.set(doc_ref, doc_ref_data)
-        # Pick any word for audio (they all sound the same)
         sample_word = next(iter(all_spellings))
         tests.append({
             'homoph': homoph_key,
             'test_id': test_id,
             'amount': len(all_spellings),
-            'audio_url': get_audio_url(sample_word),
+            'sample_word': sample_word,
         })
 
     batch.commit()

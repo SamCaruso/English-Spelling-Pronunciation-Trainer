@@ -4,3 +4,6 @@ __pycache__
 *.log
 .git
 cap/
+*.json
+scripts/*.json
+capdepl/

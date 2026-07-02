@@ -25,7 +25,7 @@ class SetNameRequest(BaseModel):
 
 class PhonemesCoveredResponse(BaseModel):
     phoneme: StrictStr
-    audio_url: Optional[StrictStr] = None
+    api_word: StrictStr
     patterns: dict[StrictStr, list[StrictStr]]
 
 
@@ -34,7 +34,7 @@ class PhonemesCoveredResponse(BaseModel):
 class LearnResponse(BaseModel):
     phoneme: StrictStr
     ipa: StrictStr
-    audio_url: Optional[StrictStr] = None
+    api_word: StrictStr
     patterns: dict[StrictStr, list[StrictStr]]
 
 
@@ -90,7 +90,7 @@ class HomophResponse(BaseModel):
     homoph: StrictStr
     test_id: StrictStr
     amount: StrictInt
-    audio_url: Optional[StrictStr] = None
+    sample_word: StrictStr
 
 class HomophAnswerCorrect(BaseModel):
     answered: Literal['correct']

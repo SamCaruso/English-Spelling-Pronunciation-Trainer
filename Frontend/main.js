@@ -14,14 +14,12 @@ import {
     setTokenProvider,
 } from './fetch.js';
 
-const RESOLVE_TIME = 1500;
 const div = document.getElementById('app');
 
 let lastAction = null;
 let currentPhoneme = null;
 let currentUser = null;
 
-const retryAttempts = { amount: 5 };
 const restartAttempts = { amount: 2 };
 
 // Set up token provider for fetch.js
@@ -37,7 +35,13 @@ setTokenProvider(async () => {
 function showError(err) {
     if (err?.name === 'APIError') {
         console.groupCollapsed('APIError');
-        console.error('meta:', { message: err.message, kind: err.kind, retry: err.retry, status: err.status, detail: err.detail });
+        console.error('meta:', { 
+            message: err.message, 
+            kind: err.kind, 
+            retry: err.retry, 
+            status: err.status, 
+            detail: err.detail 
+        });
         console.error(err);
         console.groupEnd();
     } else {
@@ -170,7 +174,12 @@ function clickableWord(word) {
     span.textContent = word;
     span.className = 'clickable-word';
     span.title = 'Click to hear pronunciation';
-    span.addEventListener('click', () => {
+    let lastClick = 0;
+    span.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const now = Date.now();
+        if (now - lastClick < 1000) return;
+        lastClick = now;
         new Audio(wordAudioUrl(word)).play();
     });
     return span;
@@ -429,7 +438,7 @@ async function startApp(div, displayName) {
             await reviewCheck(reviewStatus, div, displayName);
         });
     } catch (err) {
-        getError(err, div, retryAttempts, lastAction);
+        getError(err, div, { amount: 5 }, lastAction);
     }
 }
 
@@ -447,14 +456,7 @@ async function reviewCheck(reviewStatus, div, displayName) {
         sub.textContent = "No new phonemes to learn. Let's review previously studied ones";
         div.append(sub);
 
-        // Fetch covered FIRST (fast), then start LLM generation
-        const coveredPromise = fetchPhonemesCovered();
-        coveredPromise.catch(() => {});
-
-        // Start LLM only after covered request is sent
-        const reviewExPromise = coveredPromise.then(() => fetchReviewExercises()).catch(() => {});
-
-        await review(div, coveredPromise, reviewExPromise);
+        await review(div);
         const bye = document.createElement('p');
         bye.className = 'general';
         bye.textContent = 'You can keep reviewing now or come back for another review session whenever you want!';
@@ -472,7 +474,7 @@ async function reviewCheck(reviewStatus, div, displayName) {
         div.append(startBtn);
         startBtn.addEventListener('click', async () => {
             try { await allowRetry(() => learn(div)); }
-            catch (err) { getError(err, div, retryAttempts, lastAction); }
+            catch (err) { getError(err, div, { amount: 5 }, lastAction); }
         });
         return;
     }
@@ -483,18 +485,11 @@ async function reviewCheck(reviewStatus, div, displayName) {
     sub.textContent = 'Ready to start the review?';
     div.append(sub);
 
-    // Fetch covered FIRST (fast), then start LLM generation
-    const coveredPromise = fetchPhonemesCovered();
-    coveredPromise.catch(() => {});
-
-    // Start LLM only after covered request is sent (avoids blocking on single-worker)
-    const reviewExPromise = coveredPromise.then(() => fetchReviewExercises()).catch(() => {});
-
-    await review(div, coveredPromise, reviewExPromise);
+    await review(div);
     const learnBtn = document.createElement('button');
     learnBtn.textContent = 'Learn new phoneme';
     learnBtn.addEventListener('click', () => {
-        allowRetry(() => learn(div)).catch(err => getError(err, div, retryAttempts, lastAction));
+        allowRetry(() => learn(div)).catch(err => getError(err, div, { amount: 5 }, lastAction));
     });
     div.append(learnBtn);
 }
@@ -502,7 +497,7 @@ async function reviewCheck(reviewStatus, div, displayName) {
 
 // --- Review ---
 
-async function review(div, coveredPromise = null, reviewExPromise = null) {
+async function review(div) {
     return new Promise((resolve) => {
         const btn = document.createElement('button');
         btn.textContent = 'Start review';
@@ -520,7 +515,7 @@ async function review(div, coveredPromise = null, reviewExPromise = null) {
                     logoutBtn.addEventListener('click', () => firebase.auth().signOut());
                     div.append(logoutBtn);
 
-                    const covered = coveredPromise ? await coveredPromise : await fetchPhonemesCovered();
+                    const covered = await fetchPhonemesCovered();
                     div.append(renderCoveredList(covered));
 
                     const host = document.createElement('div');
@@ -540,13 +535,7 @@ async function review(div, coveredPromise = null, reviewExPromise = null) {
                                 warning.className = 'warning';
                                 host.append(warning);
 
-                                const loading = document.createElement('p');
-                                loading.textContent = 'Loading review exercises...';
-                                loading.className = 'general';
-                                host.append(loading);
-
-                                const data = reviewExPromise ? await reviewExPromise : await fetchReviewExercises();
-                                loading.remove();
+                                const data = await fetchReviewExercises();
                                 await runAllExercises(data.exercises, host);
 
                                 const homophs = await fetchReviewHomophones();
@@ -560,10 +549,8 @@ async function review(div, coveredPromise = null, reviewExPromise = null) {
                                 host.append(done);
                                 startResolve();
                             } catch (err) {
-                                const exerciseRetryAttempts = { amount: 5 };
-                                getError(err, host, exerciseRetryAttempts, async () => {
-                                    // Quick connectivity check before the long LLM request
-                                    await fetchPhonemesCovered();
+                                getError(err, host, { amount: 5 }, async () => {
+                                    host.replaceChildren();
                                     const data = await fetchReviewExercises();
                                     await runAllExercises(data.exercises, host);
 
@@ -585,7 +572,7 @@ async function review(div, coveredPromise = null, reviewExPromise = null) {
                     resolve();
                 });
             } catch (err) {
-                getError(err, div, retryAttempts, lastAction);
+                getError(err, div, { amount: 5 }, lastAction);
             }
         });
     });
@@ -607,16 +594,12 @@ async function learn(div) {
     const phoneme = await fetchLearn();
     currentPhoneme = phoneme.phoneme;
 
-    // Start generating exercises immediately in the background
-    const exercisePromise = fetchExercises(currentPhoneme);
-    exercisePromise.catch(() => {}); // Suppress unhandled rejection — caught when awaited
-
     const card = document.createElement('div');
     card.className = 'phoneme-card';
 
     const intro = document.createElement('h2');
     intro.textContent = `New phoneme: ${phoneme.ipa}  `;
-    intro.append(playAudio(phoneme.audio_url));
+    intro.append(playAudio(wordAudioUrl(phoneme.api_word)));
 
     const patternsHeading = document.createElement('h3');
     patternsHeading.textContent = 'Most common spelling patterns:';
@@ -649,13 +632,8 @@ async function learn(div) {
     exerciseBtn.addEventListener('click', async () => {
         try {
             exerciseHost.replaceChildren();
-            const loading = document.createElement('p');
-            loading.textContent = 'Loading exercises...';
-            loading.className = 'general';
-            exerciseHost.append(loading);
 
-            const data = await exercisePromise;
-            exerciseHost.replaceChildren();
+            const data = await fetchExercises(currentPhoneme);
 
             const warning = document.createElement('p');
             warning.textContent = 'Some of the following words may not be spelt with the common patterns above';
@@ -674,7 +652,7 @@ async function learn(div) {
                     const homophs = await fetchHomophones(currentPhoneme);
                     await runHomophones(homophs, exerciseHost);
                 } catch (err) {
-                    getError(err, exerciseHost, retryAttempts, async () => {
+                    getError(err, exerciseHost, { amount: 5 }, async () => {
                         exerciseHost.replaceChildren();
                         const homophs = await fetchHomophones(currentPhoneme);
                         await runHomophones(homophs, exerciseHost);
@@ -682,7 +660,7 @@ async function learn(div) {
                 }
             });
         } catch (err) {
-            getError(err, exerciseHost, retryAttempts, async () => {
+            getError(err, exerciseHost, { amount: 5 }, async () => {
                 exerciseHost.replaceChildren();
                 const data = await fetchExercises(currentPhoneme);
                 exerciseHost.replaceChildren();
@@ -972,7 +950,7 @@ async function runHomophones(homophs, host, { reviewRound = false } = {}) {
                 });
             }
         } catch (err) {
-            getError(err, host, retryAttempts, async () => {
+            getError(err, host, { amount: 5 }, async () => {
                 await saveProgress(currentPhoneme);
                 const bye = document.createElement('p');
                 bye.className = 'general';
@@ -995,10 +973,6 @@ async function runSingleReview(phoneme, host) {
         const covered = await fetchPhonemesCovered();
         const phonemeData = covered.find(p => p.phoneme === phoneme);
 
-        // Start generating exercises immediately in the background
-        const exercisePromise = fetchExercises(phoneme);
-        exercisePromise.catch(() => {}); // Suppress unhandled rejection — caught when awaited
-
         loading.remove();
 
         // Show the phoneme card (like when it was first learnt)
@@ -1008,7 +982,7 @@ async function runSingleReview(phoneme, host) {
 
             const intro = document.createElement('h2');
             intro.textContent = `Reviewing: /${phonemeData.phoneme}/  `;
-            intro.append(playAudio(phonemeData.audio_url));
+            intro.append(playAudio(wordAudioUrl(phonemeData.api_word)));
 
             const patternsHeading = document.createElement('h3');
             patternsHeading.textContent = 'Most common spelling patterns:';
@@ -1045,14 +1019,8 @@ async function runSingleReview(phoneme, host) {
             startBtn.addEventListener('click', async () => {
                 startBtn.remove();
 
-                const exLoading = document.createElement('p');
-                exLoading.textContent = 'Loading exercises...';
-                exLoading.className = 'general';
-                exerciseHost.append(exLoading);
-
                 try {
-                    const data = await exercisePromise;
-                    exLoading.remove();
+                    const data = await fetchExercises(phoneme);
 
                     const warning = document.createElement('p');
                     warning.textContent = 'Some of the following words may not be spelt with the common patterns above';
@@ -1071,7 +1039,7 @@ async function runSingleReview(phoneme, host) {
 
                     resolve();
                 } catch (err) {
-                    getError(err, exerciseHost, retryAttempts, async () => {
+                    getError(err, exerciseHost, { amount: 5 }, async () => {
                         exerciseHost.replaceChildren();
                         const data = await fetchExercises(phoneme);
                         await runAllExercises(data.exercises, exerciseHost);
@@ -1092,18 +1060,12 @@ async function runSingleReview(phoneme, host) {
         // Show review options again
         await showReviewOptions(host);
     } catch (err) {
-        getError(err, host, retryAttempts, () => runSingleReview(phoneme, host));
+        getError(err, host, { amount: 5 }, () => runSingleReview(phoneme, host));
     }
 }
 
 
-async function runMixedReview(host, reviewExPromise = null) {
-    // Start generating exercises immediately in the background
-    if (!reviewExPromise) {
-        reviewExPromise = fetchReviewExercises();
-        reviewExPromise.catch(() => {}); // Suppress unhandled rejection — caught when awaited
-    }
-
+async function runMixedReview(host) {
     const startBtn = document.createElement('button');
     startBtn.textContent = 'Start exercises';
     host.append(startBtn);
@@ -1112,19 +1074,13 @@ async function runMixedReview(host, reviewExPromise = null) {
         startBtn.addEventListener('click', async () => {
             startBtn.remove();
 
-            const loading = document.createElement('p');
-            loading.textContent = 'Loading review exercises...';
-            loading.className = 'general';
-            host.append(loading);
-
             try {
                 const warning = document.createElement('p');
                 warning.textContent = 'Some of the following words may not be spelt with the common patterns above';
                 warning.className = 'warning';
                 host.append(warning);
 
-                const data = await reviewExPromise;
-                loading.remove();
+                const data = await fetchReviewExercises();
                 await runAllExercises(data.exercises, host);
 
                 const homophs = await fetchReviewHomophones();
@@ -1141,7 +1097,7 @@ async function runMixedReview(host, reviewExPromise = null) {
                 await showReviewOptions(host);
                 startResolve();
             } catch (err) {
-                getError(err, host, retryAttempts, async () => {
+                getError(err, host, { amount: 5 }, async () => {
                     host.replaceChildren();
                     const data = await fetchReviewExercises();
                     await runAllExercises(data.exercises, host);
@@ -1180,7 +1136,7 @@ function renderCoveredList(covered) {
         phonemeText.style.fontWeight = 'bold';
         phonemeText.style.fontSize = '1.3rem';
         phonemeText.textContent = `/${p.phoneme}/  `;
-        li.append(phonemeText, playAudio(p.audio_url));
+        li.append(phonemeText, playAudio(wordAudioUrl(p.api_word)));
 
         const patternsLabel = document.createElement('p');
         patternsLabel.textContent = 'Most common spelling patterns:';
@@ -1222,18 +1178,12 @@ async function startFullReview() {
     logoutBtn.addEventListener('click', () => firebase.auth().signOut());
     div.append(logoutBtn);
 
-    // Fetch covered phonemes FIRST (fast), then start LLM generation
     const covered = await fetchPhonemesCovered();
-
-    // Start generating exercises in the background AFTER covered data is loaded
-    const reviewExPromise = fetchReviewExercises();
-    reviewExPromise.catch(() => {});
-
     div.append(renderCoveredList(covered));
 
     const newHost = document.createElement('div');
     div.append(newHost);
-    await runMixedReview(newHost, reviewExPromise);
+    await runMixedReview(newHost);
 }
 
 
@@ -1299,11 +1249,11 @@ async function testHomophone(homoph, index, host) {
     const target = document.createElement('span');
     target.textContent = homoph.homoph;
     target.className = 'test clickable-word';
-    if (homoph.audio_url) {
+    if (homoph.sample_word) {
         target.style.cursor = 'pointer';
         target.title = 'Click to hear pronunciation';
         target.addEventListener('click', () => {
-            new Audio(homoph.audio_url).play();
+            new Audio(wordAudioUrl(homoph.sample_word)).play();
         });
     }
     const rest = document.createTextNode(` has ${homoph.amount} homophones`);
@@ -1406,7 +1356,7 @@ firebase.auth().onAuthStateChanged((user) => {
     if (user) {
         showLoggedIn(div, user).catch(err => {
             console.error('Login flow error:', err);
-            getError(err, div, retryAttempts, () => showLoggedIn(div, user));
+            getError(err, div, { amount: 5 }, () => showLoggedIn(div, user));
         });
     } else {
         currentUser = null;

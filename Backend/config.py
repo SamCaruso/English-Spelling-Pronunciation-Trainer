@@ -13,4 +13,5 @@ FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 # Firestore collection names
 USERS_COLLECTION = 'users'
 TESTS_COLLECTION = 'active_tests'
+POOL_COLLECTION = 'exercise_pool'
 FIRESTORE_DATABASE = 'spell-pron-trainer'

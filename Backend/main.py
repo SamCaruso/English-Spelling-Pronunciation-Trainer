@@ -3,9 +3,9 @@ FastAPI application for the English Pronunciation Trainer.
 With Firebase Authentication.
 """
 
-import config  # must be first to load .env before Google SDKs
+import config 
 
-from fastapi import FastAPI, HTTPException, Depends, Request, Header
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -16,7 +16,6 @@ import time
 import log_file
 import schemas as s
 from phonemes_dict import phonemes
-from audio_service import get_audio_url
 from user_service import (
     get_completed_phonemes,
     save_phoneme_progress,
@@ -57,7 +56,7 @@ app = FastAPI(title='English Pronunciation Trainer')
 # --- Idempotency ---
 
 IDEMPOTENCY_STORE = {}
-IDEMPOTENCY_DURATION = 6000  # seconds
+IDEMPOTENCY_DURATION = 6000
 
 
 def clean_idempotency_store():
@@ -108,13 +107,13 @@ async def firebase_config():
 # --- Authenticated endpoints (user_id from Firebase token) ---
 
 @app.get('/api/reviewstatus', response_model=s.ReviewResponse)
-async def review_status(request: Request, user_id: str = Depends(get_current_user)):
+async def review_status(user_id: str = Depends(get_current_user)):
     status = get_review_status(user_id, len(phonemes))
     return {'status': status}
 
 
 @app.get('/api/username')
-async def get_name(request: Request, user_id: str = Depends(get_current_user)):
+async def get_name(user_id: str = Depends(get_current_user)):
     name = get_user_name(user_id)
     return {'name': name}
 
@@ -126,26 +125,24 @@ async def set_name(body: s.SetNameRequest, user_id: str = Depends(get_current_us
 
 
 @app.get('/api/phonemescovered', response_model=list[s.PhonemesCoveredResponse])
-async def phonemes_covered(request: Request, user_id: str = Depends(get_current_user)):
+async def phonemes_covered(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     result = []
     for p in completed:
-        audio_url = get_audio_url(phonemes[p]['api'])
         patterns = logic.get_patterns(p)
-        result.append({'phoneme': p, 'audio_url': audio_url, 'patterns': patterns})
+        result.append({'phoneme': p, 'api_word': phonemes[p]['api'], 'patterns': patterns})
     return result
 
 
 @app.get('/api/learn', response_model=s.LearnResponse)
-async def learn(request: Request, user_id: str = Depends(get_current_user)):
+async def learn(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     phoneme = logic.pick_new_phoneme(completed)
     patterns = logic.get_patterns(phoneme)
-    audio_url = get_audio_url(phonemes[phoneme]['api'])
     return {
         'phoneme': phoneme,
         'ipa': f'/{phoneme}/',
-        'audio_url': audio_url,
+        'api_word': phonemes[phoneme]['api'],
         'patterns': patterns,
     }
 
@@ -191,7 +188,7 @@ async def get_homophones(phoneme: str, user_id: str = Depends(get_current_user))
 
 
 @app.get('/api/reviewexercises', response_model=s.ExercisesResponse)
-async def get_review_exercises(request: Request, user_id: str = Depends(get_current_user)):
+async def get_review_exercises(user_id: str = Depends(get_current_user)):
     """Generate mixed review exercises for all completed phonemes (2 items per phoneme per level)."""
     completed = get_completed_phonemes(user_id)
     if not completed:
@@ -225,7 +222,7 @@ async def get_review_exercises(request: Request, user_id: str = Depends(get_curr
 
 
 @app.get('/api/reviewhomophones', response_model=list[s.HomophResponse])
-async def review_homophones(request: Request, user_id: str = Depends(get_current_user)):
+async def review_homophones(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     if not completed:
         return []
