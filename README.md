@@ -14,8 +14,6 @@ A web app that helps learners master British English spelling and pronunciation,
 3. **Homophones** — Users identify all valid spellings for words that sound the same.
 4. **Review** — Mixed exercises across all previously studied phonemes.
 
-All 12 words in each phoneme appear exactly once per session, distributed randomly across the three levels.
-
 ## AI Approach
 
 The app uses a hybrid AI approach:
@@ -67,7 +65,8 @@ This balances the flexibility of generative AI with the consistency and speed re
 │   └── requirements.txt      # Python dependencies
 ├── Frontend/
 │   ├── index.html            # Entry point (fetches Firebase config from backend)
-│   ├── main.js               # App logic and UI rendering
+│   ├── main.js               # App flow, auth, exercises, error handling
+│   ├── dom-utils.js          # Reusable DOM rendering utilities
 │   ├── fetch.js              # API client with error handling
 │   └── style.css             # Styling
 ├── scripts/
