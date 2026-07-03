@@ -8,6 +8,7 @@ import config
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from collections.abc import Callable
 from pathlib import Path
 import logging
 import random
@@ -59,14 +60,14 @@ IDEMPOTENCY_STORE = {}
 IDEMPOTENCY_DURATION = 6000
 
 
-def clean_idempotency_store():
+def clean_idempotency_store() -> None:
     now = time.time()
     expired = [key for key, value in IDEMPOTENCY_STORE.items() if now - value['time'] > IDEMPOTENCY_DURATION]
     for key in expired:
         IDEMPOTENCY_STORE.pop(key, None)
 
 
-def check_idempotency(idempotency_key: str, endpoint: str, func, *args):
+def check_idempotency(idempotency_key: str, endpoint: str, func: Callable[[str, str], dict | None], test_id: str, answer: str) -> dict | JSONResponse:
     """Check if this request was already processed. If so, return cached response."""
     clean_idempotency_store()
 
@@ -78,7 +79,9 @@ def check_idempotency(idempotency_key: str, endpoint: str, func, *args):
     if cached:
         return JSONResponse(status_code=cached['status'], content=cached['body'])
 
-    result = func(*args)
+    result = func(test_id, answer)
+    if result is None:
+        raise HTTPException(status_code=404, detail='Test not found')
 
     IDEMPOTENCY_STORE[store_key] = {
         'time': time.time(),
@@ -92,7 +95,7 @@ def check_idempotency(idempotency_key: str, endpoint: str, func, *args):
 # --- Public endpoint (no auth needed) ---
 
 @app.get('/api/firebase-config')
-async def firebase_config():
+def firebase_config():
     """Serve Firebase config to the frontend (keeps API key out of source code)."""
     return {
         'apiKey': config.FIREBASE_API_KEY,
@@ -107,25 +110,25 @@ async def firebase_config():
 # --- Authenticated endpoints (user_id from Firebase token) ---
 
 @app.get('/api/reviewstatus', response_model=s.ReviewResponse)
-async def review_status(user_id: str = Depends(get_current_user)):
+def review_status(user_id: str = Depends(get_current_user)):
     status = get_review_status(user_id, len(phonemes))
     return {'status': status}
 
 
 @app.get('/api/username')
-async def get_name(user_id: str = Depends(get_current_user)):
+def get_name(user_id: str = Depends(get_current_user)):
     name = get_user_name(user_id)
     return {'name': name}
 
 
 @app.post('/api/username')
-async def set_name(body: s.SetNameRequest, user_id: str = Depends(get_current_user)):
+def set_name(body: s.SetNameRequest, user_id: str = Depends(get_current_user)):
     save_user_name(user_id, body.name)
     return {'status': 'ok'}
 
 
 @app.get('/api/phonemescovered', response_model=list[s.PhonemesCoveredResponse])
-async def phonemes_covered(user_id: str = Depends(get_current_user)):
+def phonemes_covered(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     result = []
     for p in completed:
@@ -135,7 +138,7 @@ async def phonemes_covered(user_id: str = Depends(get_current_user)):
 
 
 @app.get('/api/learn', response_model=s.LearnResponse)
-async def learn(user_id: str = Depends(get_current_user)):
+def learn(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     phoneme = logic.pick_new_phoneme(completed)
     patterns = logic.get_patterns(phoneme)
@@ -148,7 +151,7 @@ async def learn(user_id: str = Depends(get_current_user)):
 
 
 @app.get('/api/exercises/{phoneme}', response_model=s.ExercisesResponse)
-async def get_exercises(phoneme: str, user_id: str = Depends(get_current_user)):
+def get_exercises(phoneme: str, user_id: str = Depends(get_current_user)):
     if phoneme not in phonemes:
         raise HTTPException(status_code=404, detail=f'Phoneme /{phoneme}/ not found')
     spelling = phonemes[phoneme]['spelling']
@@ -165,22 +168,16 @@ async def get_exercises(phoneme: str, user_id: str = Depends(get_current_user)):
 
 
 @app.post('/api/checkanswer', response_model=s.AnswerResponse)
-async def check_exercise_answer(
+def check_exercise_answer(
     body: s.AnswerRequest,
     user_id: str = Depends(get_current_user),
     idempotency_key: str = Header(None, alias='Idempotency-Key'),
 ):
-    def process():
-        result = check_answer(body.test_id, body.answer)
-        if result is None:
-            raise HTTPException(status_code=404, detail='Test not found')
-        return result
-
-    return check_idempotency(idempotency_key, 'checkanswer', process)
+    return check_idempotency(idempotency_key, 'checkanswer', check_answer, body.test_id, body.answer)
 
 
 @app.get('/api/homophones/{phoneme}', response_model=list[s.HomophResponse])
-async def get_homophones(phoneme: str, user_id: str = Depends(get_current_user)):
+def get_homophones(phoneme: str, user_id: str = Depends(get_current_user)):
     if phoneme not in phonemes:
         raise HTTPException(status_code=404, detail=f'Phoneme /{phoneme}/ not found')
     keys = logic.get_homophone_keys(phoneme)
@@ -188,7 +185,7 @@ async def get_homophones(phoneme: str, user_id: str = Depends(get_current_user))
 
 
 @app.get('/api/reviewexercises', response_model=s.ExercisesResponse)
-async def get_review_exercises(user_id: str = Depends(get_current_user)):
+def get_review_exercises(user_id: str = Depends(get_current_user)):
     """Generate mixed review exercises for all completed phonemes (2 items per phoneme per level)."""
     completed = get_completed_phonemes(user_id)
     if not completed:
@@ -222,7 +219,7 @@ async def get_review_exercises(user_id: str = Depends(get_current_user)):
 
 
 @app.get('/api/reviewhomophones', response_model=list[s.HomophResponse])
-async def review_homophones(user_id: str = Depends(get_current_user)):
+def review_homophones(user_id: str = Depends(get_current_user)):
     completed = get_completed_phonemes(user_id)
     if not completed:
         return []
@@ -234,22 +231,16 @@ async def review_homophones(user_id: str = Depends(get_current_user)):
 
 
 @app.post('/api/checkhomophanswer', response_model=s.HomophAnswerResponse)
-async def check_homoph(
+def check_homoph(
     body: s.AnswerRequest,
     user_id: str = Depends(get_current_user),
     idempotency_key: str = Header(None, alias='Idempotency-Key'),
 ):
-    def process():
-        result = check_homophone_answer(body.test_id, body.answer)
-        if result is None:
-            raise HTTPException(status_code=404, detail='Homophone test not found')
-        return result
-
-    return check_idempotency(idempotency_key, 'checkhomophanswer', process)
+    return check_idempotency(idempotency_key, 'checkhomophanswer', check_homophone_answer, body.test_id, body.answer)
 
 
 @app.post('/api/saveprogress', response_model=s.SaveProgressResponse)
-async def save_progress(body: s.SaveProgress, user_id: str = Depends(get_current_user)):
+def save_progress(body: s.SaveProgress, user_id: str = Depends(get_current_user)):
     save_phoneme_progress(user_id, body.phoneme)
     return {'status': 'ok'}
 

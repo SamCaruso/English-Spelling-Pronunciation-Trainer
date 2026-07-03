@@ -37,7 +37,7 @@ def make_doc_id(phoneme: str, level: int, ipa_key: str, index: int) -> str:
     return f'{safe_phoneme}_L{level}_{key_hash}_{index}'
 
 
-def clear_pool():
+def clear_pool() -> None:
     """Delete all existing documents in the exercise_pool collection."""
     print('Clearing existing pool...')
     docs = db.collection(POOL_COLLECTION).stream()
@@ -54,7 +54,7 @@ def clear_pool():
     print(f'  Deleted {count} documents')
 
 
-def upload():
+def upload() -> None:
     """Upload exercise_pool.json to Firestore."""
     if not os.path.exists(INPUT_FILE):
         print(f'Error: {INPUT_FILE} not found. Run generate_pool_json.py first.')

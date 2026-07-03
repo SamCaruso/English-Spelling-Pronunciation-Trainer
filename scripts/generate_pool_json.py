@@ -92,7 +92,7 @@ def generate_for_word(ipa_key: str, correct: str, wrong1: str, wrong2: str) -> l
     return result['sentences']
 
 
-def main():
+def main() -> None:
     # Load existing file if it exists (to skip already-generated words)
     if os.path.exists(OUTPUT_FILE):
         with open(OUTPUT_FILE, 'r', encoding='utf-8') as f:

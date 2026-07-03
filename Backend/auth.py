@@ -25,7 +25,7 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app()
 
 
-async def get_current_user(request: Request) -> str:
+def get_current_user(request: Request) -> str:
     """
     Extract and verify the Firebase ID token from the Authorization header.
     Returns the Firebase UID as the user_id.

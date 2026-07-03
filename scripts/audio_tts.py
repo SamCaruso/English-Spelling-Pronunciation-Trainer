@@ -36,7 +36,7 @@ audio_config = texttospeech.AudioConfig(
 bucket = storage_client.bucket(GCS_BUCKET_NAME)
 
 
-def collect_all_words():
+def collect_all_words() -> list[str]:
     """Collect all unique words that need audio across all phonemes."""
     words = set()
 
@@ -61,7 +61,7 @@ def collect_all_words():
     return sorted(words)
 
 
-def generate_and_upload(word):
+def generate_and_upload(word: str) -> None:
     """Generate TTS audio for a word and upload to GCS."""
     filename = f'{AUDIO_PREFIX}/{word}.mp3'
     blob = bucket.blob(filename)
